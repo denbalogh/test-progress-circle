@@ -1,50 +1,44 @@
 <template>
   <div class="wrapper" :style="wrapperStyle">
-    <!-- Default progress -->
     <svg
       :viewBox="`0 0 ${diameter} ${diameter}`"
       :width="diameter"
       :height="diameter"
       class="progressCircle"
-      v-if="size === 'default'"
     >
+      <!-- Default size START -->
       <g
-        :transform="
-          `rotate(${rotate},${diameter / 2},${diameter / 2}) ${
-            reverse ? 'scale(1,-1) translate(0, -' + diameter + ')' : ''
-          }`
-        "
+        v-if="size === SIZE_DEFAULT"
+        :transform="`rotate(${rotate},${halfDiameter},${halfDiameter})`"
       >
         <circle
-          :cx="diameter / 2"
-          :cy="diameter / 2"
+          :cx="halfDiameter"
+          :cy="halfDiameter"
           :r="getRadius()"
           :stroke="inactiveStrokeColor"
           :stroke-width="defaultStrokeWidth"
           fill="none"
-          :stroke-dasharray="getLengths()"
+          :stroke-dasharray="getLengthOfDashAndSpaceBetween()"
         />
         <path
           :d="
-            describeArc(diameter / 2, diameter / 2, getRadius(), 0, activeEnd())
+            describeArc(
+              halfDiameter,
+              halfDiameter,
+              getRadius(),
+              0,
+              getActiveEnd()
+            )
           "
           fill="none"
           :stroke="strokeColor"
           :stroke-width="defaultStrokeWidth"
-          :stroke-dasharray="getLengths()"
+          :stroke-dasharray="getLengthOfDashAndSpaceBetween()"
         />
       </g>
-    </svg>
-    <!-- Compact progress -->
-    <svg
-      class="progressCircle"
-      v-if="size === 'compact'"
-      :width="diameter"
-      :height="diameter"
-      version="1.1"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
+      <!-- Default size END -->
+      <!-- Compact size START -->
+      <defs v-if="size === SIZE_COMPACT">
         <radialGradient
           :id="'radial-gradient' + _uid"
           :fx="gradient.fx"
@@ -58,6 +52,7 @@
         </radialGradient>
       </defs>
       <circle
+        v-if="size === SIZE_COMPACT"
         :r="innerCircleRadius"
         :cx="radius"
         :cy="radius"
@@ -69,6 +64,7 @@
         :style="strokeStyle"
       ></circle>
       <circle
+        v-if="size === SIZE_COMPACT"
         :transform="'rotate(270, ' + radius + ',' + radius + ')'"
         :r="innerCircleRadius"
         :cx="radius"
@@ -80,11 +76,12 @@
         :stroke-linecap="compactStrokeLinecap"
         :style="progressStyle"
       ></circle>
+      <!-- Compact size END -->
     </svg>
-    <!-- Progress values -->
+    <!-- Values and label -->
     <div class="content">
       <span class="progressValue" :style="{ fontSize: valueFontSize }">
-        <span v-if="size === 'compact'">
+        <span v-if="size === SIZE_COMPACT">
           {{ currentValue }}/{{ maxValue }}
         </span>
         <span v-else> {{ currentValue }} / {{ maxValue }} </span>
@@ -95,6 +92,8 @@
 </template>
 
 <script>
+const [SIZE_DEFAULT, SIZE_COMPACT] = ["default", "compact"];
+
 export default {
   name: "ProgressCircle",
   props: {
@@ -103,9 +102,13 @@ export default {
     label: { type: String, required: false, default: "" },
     size: {
       type: String,
-      validator: val => ["default", "compact"].includes(val),
-      default: "default"
+      validator: val => [SIZE_DEFAULT, SIZE_COMPACT].includes(val),
+      default: SIZE_DEFAULT
     }
+  },
+  beforeCreate() {
+    this.SIZE_DEFAULT = SIZE_DEFAULT;
+    this.SIZE_COMPACT = SIZE_COMPACT;
   },
   data() {
     return {
@@ -117,8 +120,8 @@ export default {
         r: 0.65
       },
       strokeDashoffset: 0,
-      diameter: this.size === "default" ? 200 : 120,
-      valueFontSize: this.size === "default" ? "1rem" : "1.5rem",
+      diameter: this.size === SIZE_DEFAULT ? 200 : 120,
+      valueFontSize: this.size === SIZE_DEFAULT ? "1.2rem" : "1.5rem",
       strokeColor: "#ff0071",
       inactiveStrokeColor: "#d6d6d8",
       compactStrokeWidth: 7,
@@ -128,14 +131,18 @@ export default {
       dashCount: 80,
       defaultStrokeWidth: 20,
       dashSpacing: 1 / 4,
-      rotate: -90,
-      reverse: false
+      rotate: -90
     };
   },
   computed: {
-    // Compact progress
-    radius() {
+    defaultProgressValue() {
+      return Math.floor((this.currentValue * this.dashCount) / this.maxValue);
+    },
+    halfDiameter() {
       return this.diameter / 2;
+    },
+    radius() {
+      return this.halfDiameter;
     },
     circumference() {
       return Math.PI * this.innerCircleDiameter;
@@ -185,54 +192,34 @@ export default {
         width: `${this.diameter}px`,
         strokeWidth: `${this.compactStrokeWidth}px`
       };
-    },
-    // Default progress
-    defaultProgressValue() {
-      return Math.floor((this.currentValue * this.dashCount) / this.maxValue);
     }
   },
   methods: {
-    // Compact progress
-    changeProgress() {
-      this.strokeDashoffset =
-        ((100 - this.finishedPercentage) / 100) * this.circumference;
-      const angleOffset = (this.currentValue - 1) * this.circleSlice;
-      let i = angleOffset / this.animateSlice;
-      const incrementer = Math.abs(i - this.totalPoints) / this.totalPoints;
-      const isMoveForward = i < this.totalPoints;
-    },
-    // Default progress
-    // Determine the 'end' angle of the path for the active dashes in degrees.
-    activeEnd() {
+    getActiveEnd() {
       if (this.defaultProgressValue == 0) {
         return 0;
       }
       return (
         360 *
-        (this.defaultProgressValue * this.dashPerc() +
-          (this.defaultProgressValue - 1) * this.spacePerc())
+        (this.defaultProgressValue * this.getDashPerc() +
+          (this.defaultProgressValue - 1) * this.getSpacePerc())
       );
     },
-    // An array of the length of the dash & the length of the space between dashes
-    getLengths() {
+    getLengthOfDashAndSpaceBetween() {
       return [
-        2 * Math.PI * this.getRadius() * this.dashPerc(),
-        2 * Math.PI * this.getRadius() * this.spacePerc()
+        2 * Math.PI * this.getRadius() * this.getDashPerc(),
+        2 * Math.PI * this.getRadius() * this.getSpacePerc()
       ];
     },
-    // The space beween dashes as a percentage of the total length
-    spacePerc() {
+    getSpacePerc() {
       return this.dashSpacing / this.dashCount;
     },
-    // The length of a dash as a percentage of the total length
-    dashPerc() {
+    getDashPerc() {
       return (1 - this.dashSpacing) / this.dashCount;
     },
-    // Radius of the circle arc
     getRadius() {
       return (this.diameter - this.defaultStrokeWidth) / 2;
     },
-    // SVG path definition requires points in cartesian space
     polarToCartesian(cx, cy, radius, degrees) {
       const radians = (degrees * Math.PI) / 180.0;
       return {
@@ -240,30 +227,38 @@ export default {
         y: cy + radius * Math.sin(radians)
       };
     },
-    // Path definition for circular arc
     describeArc(cx, cy, radius, startDegrees, endDegrees) {
       const start = this.polarToCartesian(cx, cy, radius, startDegrees);
       const end = this.polarToCartesian(cx, cy, radius, endDegrees);
-      let largeArc = Math.abs(endDegrees - startDegrees) < 180 ? 0 : 1;
-      let sweep = endDegrees < startDegrees ? 0 : 1;
+      const largeArc = Math.abs(endDegrees - startDegrees) < 180 ? 0 : 1;
+      const sweep = endDegrees < startDegrees ? 0 : 1;
       return `M${start.x} ${start.y} A${radius} ${radius} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`;
+    },
+    changeCompactProgress() {
+      this.strokeDashoffset =
+        ((100 - this.finishedPercentage) / 100) * this.circumference;
     }
   },
   watch: {
     maxValue() {
-      this.changeProgress();
+      if (this.size === SIZE_COMPACT) {
+        this.changeCompactProgress();
+      }
     },
     currentValue() {
-      this.changeProgress();
+      if (this.size === SIZE_COMPACT) {
+        this.changeCompactProgress();
+      }
     }
   },
   created() {
-    this.changeProgress();
+    if (this.size === SIZE_COMPACT) {
+      this.changeCompactProgress();
+    }
   }
 };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
 .wrapper {
   position: relative;
