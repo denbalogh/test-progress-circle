@@ -54,4 +54,4 @@ source file is ->[HERE](https://github.com/denbalogh/test-progress-circle/blob/m
 
 ## What is missing
 - font family (wasn't defined and couldn't find it here https://www.whatfontis.com/)
-- default size progress isn't animated when `currentValue` is changed
+- `default` size progress isn't animated when `currentValue` is changed
