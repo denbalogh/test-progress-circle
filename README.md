@@ -5,20 +5,11 @@
 npm install
 ```
 
-### Compiles and hot-reloads for development
+### Compiles and hot-reloads
 ```
 npm run serve
 ```
 
-### Compiles and minifies for production
-```
-npm run build
-```
-
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+### What is missing
+- font family (wasn't defined and couldn't find it here https://www.whatfontis.com/)
+- default size progress isn't animated when currentValue is changed
